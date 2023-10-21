@@ -12,6 +12,22 @@ import fs2.io.file.Files
 import fs2.io.file.Path
 import fs2.io.process.Processes
 
+enum PathStatus:
+  case Untracked
+  case Modified
+  case Added
+  case Deleted
+
+def pathStatusFromStatusLine(sl: StatusLine): PathStatus = (sl.x, sl.y) match {
+  case ('?', '?') => PathStatus.Untracked
+  case ('A', ' ') => PathStatus.Added
+  case (' ', 'M') => PathStatus.Modified
+  case ('M', '_') => PathStatus.Modified
+  case (' ', 'D') => PathStatus.Deleted
+  case ('D', '_') => PathStatus.Deleted
+  case (_, _)     => PathStatus.Modified
+}
+
 case class StatusLine(
     x: Char,
     y: Char,
@@ -33,7 +49,36 @@ case class RepoStatus(
     statusLines: List[StatusLine],
     unpushed: Int,
     unpulled: Int
-)
+) {
+
+  val statuses = statusLines.map(pathStatusFromStatusLine).toSet
+
+  def isModified = statusLines.nonEmpty || unpushed > 0 || unpulled > 0
+
+  def hasModified = statuses.contains(PathStatus.Modified)
+  def hasUntracked = statuses.contains(PathStatus.Untracked)
+  def hasAdded = statuses.contains(PathStatus.Added)
+  def hasDeleted = statuses.contains(PathStatus.Deleted)
+  def hasUnpushed = unpushed > 0
+  def hasUnpulled = unpulled > 0
+
+  def formatTags = {
+    val m = if hasModified then "M" else "-"
+    val u = if hasUntracked then "?" else "-"
+    val a = if hasAdded then "A" else "-"
+    val d = if hasDeleted then "D" else "-"
+    val up = if hasUnpushed then "^" else "-"
+    val down = if hasUnpulled then "v" else "-"
+    m ++ a ++ d ++ u ++ up ++ down
+  }
+
+  def repoName = repoPath.fileName
+  def repoRelativePath(relativeTo: Path) = relativeTo.relativize(repoPath)
+
+}
+
+val statusLegend =
+  "legend: modified (M), untracked (?), added (A), deleted (D), unpushed (^), unpulled (v)"
 
 class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
 
@@ -183,7 +228,11 @@ object Main
       case (root, maxDepth, maxConcurrency) =>
         AppImpl[IO]
           .getRepoStatusesBelow(root, maxDepth, maxConcurrency)
+          .map(rs => s"${rs.formatTags} ${rs.repoRelativePath(root)}")
           .evalMap(IO.println)
           .compile
-          .drain
+          .count
+          .flatMap(n =>
+            IO.println(statusLegend) *> IO.println(s"checked $n repos")
+          )
           .as(ExitCode.Success)
