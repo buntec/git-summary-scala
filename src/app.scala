@@ -1,13 +1,16 @@
 package gitsummary
 
-import cats.syntax.all.*
+import cats.data.Validated
 import cats.effect.*
 import cats.effect.implicits.*
-import fs2.Stream
-import fs2.io.file.Path
-import fs2.io.file.Files
-import fs2.io.process.Processes
 import cats.effect.std.Console
+import cats.syntax.all.*
+import com.monovore.decline.*
+import com.monovore.decline.effect.CommandIOApp
+import fs2.Stream
+import fs2.io.file.Files
+import fs2.io.file.Path
+import fs2.io.process.Processes
 
 case class StatusLine(
     x: Char,
@@ -58,12 +61,17 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
 
   def findGitReposBelow(
       root: Path,
-      maxDepth: Int
+      maxDepth: Int,
+      maxConcurrency: Int
   ): fs2.Stream[F, Path] =
     Files[F]
       .walk(root, maxDepth, false)
-      .filterNot(path => path.fileName.show.startsWith("."))
-      .evalFilter(isGitRepo)
+      .filterNot(_.fileName.show.startsWith("."))
+      .parEvalMap(maxConcurrency)(path => isGitRepo(path).tupleLeft(path))
+      .mapFilter {
+        case (p, true)  => p.some
+        case (_, false) => none
+      }
 
   def getUnpushed(path: Path): F[Int] =
     fs2.io.process
@@ -123,17 +131,17 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
       }
 
   def getRepoStatus(path: Path): F[RepoStatus] =
-    (getStatusLines(path), getUnpulled(path), getUnpushed(path)).parTupled.map {
+    (getStatusLines(path), getUnpulled(path), getUnpushed(path)).parTupled.map:
       case (lines, unpulled, unpushed) =>
         RepoStatus(path, lines, unpulled, unpushed)
-    }
 
   def getRepoStatusesBelow(
       path: Path,
-      maxDepth: Int
+      maxDepth: Int,
+      maxConcurrency: Int
   ): Stream[F, RepoStatus] =
-    findGitReposBelow(path, maxDepth)
-      .parEvalMapUnordered(64)(path =>
+    findGitReposBelow(path, maxDepth, maxConcurrency)
+      .parEvalMapUnordered(maxConcurrency)(path =>
         getRepoStatus(path)
           .onError(t =>
             Console[F].println(s"Failed to get repo status for $path")
@@ -142,12 +150,40 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
       )
       .collect { case Right(a) => a }
 
-object Main extends IOApp.Simple:
+object Main
+    extends CommandIOApp(
+      "git-summary",
+      "git-summary prints a summary of git repo statuses of all repos under a given root."
+    ):
 
-  def run: IO[Unit] = AppImpl[IO]
-    .getRepoStatusesBelow(Path("."), 10)
-    .evalMap { status =>
-      IO.println(status)
-    }
-    .compile
-    .drain
+  val pathArg = Opts
+    .argument[String]()
+    .mapValidated(s =>
+      Validated.catchNonFatal(Path(s)).leftMap(_.getMessage).toValidatedNel
+    )
+
+  val maxDepthArg = Opts
+    .option[Int](
+      "max-depth",
+      "the maximum depths of subdirectories to search for git repos",
+      "g"
+    )
+    .withDefault(3)
+
+  val maxConcurrencyArg = Opts
+    .option[Int](
+      "max-concurrency",
+      "the maximum degree of concurrency when getting repo statuses",
+      "p"
+    )
+    .withDefault(128)
+
+  override def main: Opts[IO[ExitCode]] =
+    (pathArg, maxDepthArg, maxConcurrencyArg).mapN:
+      case (root, maxDepth, maxConcurrency) =>
+        AppImpl[IO]
+          .getRepoStatusesBelow(root, maxDepth, maxConcurrency)
+          .evalMap(IO.println)
+          .compile
+          .drain
+          .as(ExitCode.Success)
