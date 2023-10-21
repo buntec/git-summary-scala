@@ -207,6 +207,7 @@ object Main
     .mapValidated(s =>
       Validated.catchNonFatal(Path(s)).leftMap(_.getMessage).toValidatedNel
     )
+    .withDefault(Path("."))
 
   val maxDepthArg = Opts
     .option[Int](
