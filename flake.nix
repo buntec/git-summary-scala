@@ -1,17 +1,17 @@
 {
-  description = "A simple Scala app";
+  description =
+    "git-summary displays a concise summary of repo statuses for all git repos under a given root";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   inputs.devshell.url = "github:numtide/devshell";
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.flake-compat = {
-    url = "github:edolstra/flake-compat";
-    flake = false;
-  };
 
   outputs = { self, flake-utils, devshell, nixpkgs, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
+        pname = "git-summary";
+        version = if (self ? rev) then self.rev else "dirty";
+
         # remove unsupported platforms from this list
         supported-platforms = [ "jvm" "graal" "native" "node" ];
 
@@ -94,7 +94,7 @@
 
         scala-native-app = native-mode:
           pkgs.stdenv.mkDerivation {
-            name = "scala-native-app";
+            inherit pname version;
             src = ./src;
             buildInputs = build-packages ++ [ coursier-cache ];
 
@@ -113,12 +113,12 @@
                 --native-mode ${native-mode} \
                 --java-home=${jdk} \
                 --server=false \
-                -o app 
+                -o ${pname} 
             '';
 
             installPhase = ''
               mkdir -p $out/bin
-              cp app $out/bin
+              cp ${pname} $out/bin
             '';
           };
 
@@ -128,7 +128,7 @@
         scala-native-app-release-size = scala-native-app "release-size";
 
         jvm-app = pkgs.stdenv.mkDerivation {
-          name = "jvm-app";
+          inherit pname version;
           src = ./src;
           buildInputs = build-packages ++ [ coursier-cache ];
 
@@ -145,18 +145,18 @@
               --standalone \
               --java-home=${jdk} \
               --server=false \
-              -o app 
+              -o ${pname} 
           '';
 
           installPhase = ''
             mkdir -p $out/bin
-            cp app $out/bin
+            cp ${pname} $out/bin
           '';
         };
 
         node-app = js-mode:
           pkgs.stdenv.mkDerivation {
-            name = "scala-js-app";
+            inherit pname version;
             src = ./src;
             buildInputs = build-packages ++ [ node coursier-cache ];
 
@@ -184,12 +184,12 @@
             installPhase = ''
               mkdir -p $out/bin
               cp main.js $out/bin
-              cat << EOF > app
+              cat << EOF > ${pname}
               #!/usr/bin/env sh
               ${node}/bin/node $out/bin/main.js
               EOF
-              chmod +x app
-              cp app $out/bin
+              chmod +x ${pname}
+              cp ${pname} $out/bin
             '';
           };
 
@@ -197,7 +197,7 @@
         node-app-release = node-app "release";
 
         graal-native-image-app = pkgs.stdenv.mkDerivation {
-          name = "graal-native-image-app";
+          inherit pname version;
           src = ./src;
           buildInputs = build-packages ++ [ graal-jdk coursier-cache ];
 
@@ -224,19 +224,46 @@
               --graalvm-args -H:-CheckToolchain \
               --graalvm-args -H:+ReportExceptionStackTraces \
               --graalvm-args -H:-UseServiceLoaderFeature \
-              -o app \
+              -o ${pname}
           '';
 
           installPhase = ''
             mkdir -p $out/bin
-            cp app $out/bin
+            cp ${pname} $out/bin
           '';
         };
 
         devShell = pkgs.devshell.mkShell {
-          name = "scala-dev-shell";
-          commands =
-            [ { package = scala-cli; } { package = sbt; } { package = node; } ];
+          name = "${pname}-dev-shell";
+          commands = [
+            { package = scala-cli; }
+            { package = sbt; }
+            { package = node; }
+            {
+              name = "run-native";
+              help = "run Scala Native compiled app (no optimization)";
+              category = "scripts";
+              command = ''
+                scala-cli run . --native --native-version ${scala-native-version} -- $@
+              '';
+            }
+            {
+              name = "run-jvm";
+              help = "run compiled app on the JVM";
+              category = "scripts";
+              command = ''
+                scala-cli run . -- $@
+              '';
+            }
+            {
+              name = "run-node";
+              help = "run Scala.js compiled app on Node.js (no optimization)";
+              category = "scripts";
+              command = ''
+                scala-cli run . --js --js-module-kind common -- $@
+              '';
+            }
+          ];
           packages = build-packages ++ [ sbt metals ];
           env = [
             {
@@ -287,7 +314,7 @@
 
         apps = builtins.mapAttrs (name: value: {
           type = "app";
-          program = "${value}/bin/app";
+          program = "${value}/bin/${pname}";
         }) packages;
 
       });
