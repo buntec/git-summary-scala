@@ -198,7 +198,8 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
 object Main
     extends CommandIOApp(
       "git-summary",
-      "git-summary prints a summary of git repo statuses of all repos under a given root."
+      "git-summary prints a summary of git repo statuses of all repos under a given root.",
+      version = BuildInfo.version
     ):
 
   val pathArg = Opts

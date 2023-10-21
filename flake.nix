@@ -22,6 +22,15 @@
 
         scala-native-version = "0.4.15";
 
+        make-buildinfo = ''
+          cat << EOF > ./buildinfo.scala
+          package gitsummary
+          object BuildInfo {
+            val version = "${version}"
+          }
+          EOF
+        '';
+
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ devshell.overlays.default ];
@@ -70,6 +79,7 @@
             mkdir -p coursier-cache/v1
             mkdir -p coursier-cache/arc
             mkdir -p coursier-cache/jvm
+            ${make-buildinfo}
             scala-cli compile . --java-home=${jdk} --server=false
             ${if (supports-native) then
               "scala-cli compile . --native --native-version ${scala-native-version} --java-home=${jdk} --server=false"
@@ -106,6 +116,7 @@
 
             buildPhase = ''
               mkdir scala-cli-home
+              ${make-buildinfo}
               scala-cli --power \
                 package . \
                 --native \
@@ -140,6 +151,7 @@
 
           buildPhase = ''
             mkdir scala-cli-home
+            ${make-buildinfo}
             scala-cli --power \
               package . \
               --standalone \
@@ -168,6 +180,7 @@
 
             buildPhase = ''
               mkdir scala-cli-home
+              ${make-buildinfo}
               scala-cli --power \
                 package . \
                 --js \
@@ -209,7 +222,7 @@
 
           buildPhase = ''
             mkdir scala-cli-home
-            ls ${coursier-cache}
+            ${make-buildinfo}
             scala-cli --power \
               package . \
               --native-image \
@@ -244,6 +257,7 @@
               help = "run Scala Native compiled app (no optimization)";
               category = "scripts";
               command = ''
+                ${make-buildinfo}
                 scala-cli run . --native --native-version ${scala-native-version} -- $@
               '';
             }
@@ -252,6 +266,7 @@
               help = "run compiled app on the JVM";
               category = "scripts";
               command = ''
+                ${make-buildinfo}
                 scala-cli run . -- $@
               '';
             }
@@ -260,6 +275,7 @@
               help = "run Scala.js compiled app on Node.js (no optimization)";
               category = "scripts";
               command = ''
+                ${make-buildinfo}
                 scala-cli run . --js --js-module-kind common -- $@
               '';
             }
