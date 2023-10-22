@@ -334,8 +334,13 @@
         }) packages;
 
       }) // {
-        overlays.default = final: prev: {
-          git-summary = self.packages.${prev.system}.native;
+        overlays = {
+          default = final: prev: {
+            git-summary = self.packages.${prev.system}.graal;
+          };
+          native = final: prev: {
+            git-summary = self.packages.${prev.system}.native;
+          };
         };
       };
 }
