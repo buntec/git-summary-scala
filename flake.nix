@@ -333,5 +333,9 @@
           program = "${value}/bin/${pname}";
         }) packages;
 
-      });
+      }) // {
+        overlays.default = final: prev: {
+          inherit (self.packages.${prev.system}) native;
+        };
+      };
 }
