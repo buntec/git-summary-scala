@@ -335,7 +335,7 @@
 
       }) // {
         overlays.default = final: prev: {
-          inherit (self.packages.${prev.system}) native;
+          git-summary = self.packages.${prev.system}.native;
         };
       };
 }
