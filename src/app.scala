@@ -31,8 +31,7 @@ def pathStatusFromStatusLine(sl: StatusLine): PathStatus = (sl.x, sl.y) match {
 case class StatusLine(
     x: Char,
     y: Char,
-    path: Path,
-    originalPath: Option[Path]
+    path: Path
 )
 
 def parseGitStatusLine(line: String): Either[Throwable, StatusLine] =
@@ -40,7 +39,7 @@ def parseGitStatusLine(line: String): Either[Throwable, StatusLine] =
     case x :: y :: ' ' :: path =>
       Either
         .catchNonFatal(Path(path.mkString))
-        .map(path => StatusLine(x, y, path, None))
+        .map(path => StatusLine(x, y, path))
     case _ => Left(Exception(s"Failed to parse git status line: $line"))
   }
 
@@ -103,6 +102,14 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
 
   def isGitRepo(path: Path): F[Boolean] =
     Files[F].exists(path / ".git")
+
+  def doGitFetch(path: Path): F[Unit] =
+    fs2.io.process
+      .ProcessBuilder("git", "fetch")
+      .withWorkingDirectory(path)
+      .spawn
+      .use(_.exitValue)
+      .void
 
   def findGitReposBelow(
       root: Path,
@@ -175,19 +182,24 @@ class AppImpl[F[_]: Concurrent: Files: Processes: Console]:
 
       }
 
-  def getRepoStatus(path: Path): F[RepoStatus] =
-    (getStatusLines(path), getUnpulled(path), getUnpushed(path)).parTupled.map:
+  def getRepoStatus(path: Path, fetch: Boolean): F[RepoStatus] =
+    F.whenA(fetch)(doGitFetch(path)) *> (
+      getStatusLines(path),
+      getUnpulled(path),
+      getUnpushed(path)
+    ).parMapN:
       case (lines, unpulled, unpushed) =>
-        RepoStatus(path, lines, unpulled, unpushed)
+        RepoStatus(path, lines, unpushed, unpulled)
 
   def getRepoStatusesBelow(
       path: Path,
       maxDepth: Int,
-      maxConcurrency: Int
+      maxConcurrency: Int,
+      fetch: Boolean
   ): Stream[F, RepoStatus] =
     findGitReposBelow(path, maxDepth, maxConcurrency)
       .parEvalMapUnordered(maxConcurrency)(path =>
-        getRepoStatus(path)
+        getRepoStatus(path, fetch)
           .onError(t =>
             Console[F].println(s"Failed to get repo status for $path")
           )
@@ -209,7 +221,7 @@ object Main
     )
     .withDefault(Path("."))
 
-  val maxDepthArg = Opts
+  val maxDepthOpt = Opts
     .option[Int](
       "max-depth",
       "the maximum depths of subdirectories to search for git repos",
@@ -217,7 +229,7 @@ object Main
     )
     .withDefault(3)
 
-  val maxConcurrencyArg = Opts
+  val maxConcurrencyOpt = Opts
     .option[Int](
       "max-concurrency",
       "the maximum degree of concurrency when getting repo statuses",
@@ -225,11 +237,15 @@ object Main
     )
     .withDefault(128)
 
+  val fetchOpt = Opts
+    .flag("fetch", "if set will perform a `fetch` on every repo traversed", "f")
+    .orFalse
+
   override def main: Opts[IO[ExitCode]] =
-    (pathArg, maxDepthArg, maxConcurrencyArg).mapN:
-      case (root, maxDepth, maxConcurrency) =>
+    (pathArg, maxDepthOpt, maxConcurrencyOpt, fetchOpt).mapN:
+      case (root, maxDepth, maxConcurrency, fetch) =>
         AppImpl[IO]
-          .getRepoStatusesBelow(root, maxDepth, maxConcurrency)
+          .getRepoStatusesBelow(root, maxDepth, maxConcurrency, fetch)
           .map(rs => s"${rs.formatTags} ${rs.repoRelativePath(root)}")
           .evalMap(IO.println)
           .compile
