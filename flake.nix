@@ -99,7 +99,7 @@
           outputHashAlgo = "sha256";
           outputHashMode = "recursive";
           # NOTE: don't forget to update this when deps/platforms change!
-          outputHash = "sha256-hagKQcBvFdrTwSOgrDp78lkgj73iybe9dmynGmjynKI=";
+          outputHash = "sha256-calsicYMPr/oz4wR5LgkJIY7es5+t8tUqGAL6pF0LAw=";
         };
 
         scala-native-app = native-mode:
