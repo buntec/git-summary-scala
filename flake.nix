@@ -11,7 +11,7 @@
 
   outputs = { self, devshell, nixpkgs, my-nix-utils, typelevel-nix, ... }:
     let
-      inherit (nixpkgs.lib) genAttrs filterAttrs;
+      inherit (nixpkgs.lib) genAttrs;
 
       name = "git-summary";
 
@@ -33,14 +33,12 @@
         pkgs.callPackage my-nix-utils.lib.mkBuildScalaApp { };
 
       mkPackages = pkgs:
-        filterAttrs (name: value:
-          builtins.elem name [ "graal" "jvm" "native-release-fast" ])
         (buildScalaApp pkgs {
           inherit version;
           src = ./src;
           pname = name;
-          scala-native-version = "0.4.15";
-          sha256 = "sha256-GvBPoxXsb3ht7zMQ3j0oXaEFD5cn9sTz3IaR0M8ggXA=";
+          supported-platforms = [ "jvm" "native" ];
+          sha256 = "sha256-T4Ify4hWj7RJTEjYZhRYBO4WLjNrggNjw1DTkfd6czo=";
         });
 
     in {
@@ -74,8 +72,10 @@
         in builtins.mapAttrs (_: value: (mkApp value)) (mkPackages pkgs));
 
       overlays = {
-        default = final: _: { ${name} = (mkPackages final).graal; };
-        native = final: _: { ${name} = (mkPackages final).native; };
+        default = final: _: { ${name} = (mkPackages final).jdk; };
+        native = final: _: {
+          ${name} = (mkPackages final).native-release-fast;
+        };
       };
 
       checks = self.packages;
