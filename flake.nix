@@ -72,7 +72,7 @@
         in builtins.mapAttrs (_: value: (mkApp value)) (mkPackages pkgs));
 
       overlays = {
-        default = final: _: { ${name} = (mkPackages final).jdk; };
+        default = final: _: { ${name} = (mkPackages final).jvm; };
         native = final: _: {
           ${name} = (mkPackages final).native-release-fast;
         };
