@@ -38,7 +38,7 @@
           src = ./src;
           pname = name;
           supported-platforms = [ "jvm" "native" ];
-          sha256 = "sha256-pIDapWZB6Yj/ToTVuU3NzKeCGVH4Kb9KRwkIsRI5mlM=";
+          sha256 = "sha256-94vxv9VGgqW4WaJ2KvR/vv/AUVrAfVG1/B5SAMVZE18=";
         });
 
     in {
