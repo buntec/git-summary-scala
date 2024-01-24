@@ -19,6 +19,7 @@
 
   outputs = inputs@{ self, nixpkgs, devenv, nix-utils, treefmt-nix, ... }:
     let
+      inherit (nixpkgs) lib;
       inherit (nixpkgs.lib) genAttrs;
 
       name = "git-summary";
@@ -104,10 +105,14 @@
         in builtins.mapAttrs (_: value: (mkApp value)) (mkPackages pkgs));
 
       overlays = {
-        default = final: _: { ${name} = (mkPackages final).jvm; };
-        native = final: _: {
-          ${name} = (mkPackages final).native-release-fast;
-        };
+        default = lib.composeManyExtensions [
+          nix-utils.overlays.default
+          (final: _: { ${name} = (mkPackages final).jvm; })
+        ];
+        native = lib.composeManyExtensions [
+          nix-utils.overlays.default
+          (final: _: { ${name} = (mkPackages final).native-release-fast; })
+        ];
       };
 
       checks = self.packages;
