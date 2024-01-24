@@ -2,3 +2,5 @@
 .metals/
 .scala-build/
 buildinfo.scala
+.devenv
+.direnv

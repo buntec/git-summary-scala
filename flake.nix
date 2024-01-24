@@ -1,15 +1,23 @@
 {
   description =
-    "git-summary displays a concise summary of repo statuses for all git repos under a given root";
+    "git-summary displays a concise status summary for all git repos under a given root";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    devshell.url = "github:numtide/devshell";
-    typelevel-nix.url = "github:typelevel/typelevel-nix";
+    devenv.url = "github:cachix/devenv";
+    devenv.inputs.nixpkgs.follows = "nixpkgs";
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     nix-utils.url = "github:buntec/nix-utils";
   };
 
-  outputs = { self, devshell, nixpkgs, nix-utils, typelevel-nix, ... }:
+  nixConfig = {
+    extra-trusted-public-keys =
+      "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=";
+    extra-substituters = "https://devenv.cachix.org";
+  };
+
+  outputs = inputs@{ self, nixpkgs, devenv, nix-utils, treefmt-nix, ... }:
     let
       inherit (nixpkgs.lib) genAttrs;
 
@@ -40,25 +48,41 @@
           depsHash = "sha256-+hSz3top9VNfKPye5jFzXutrjsj5NV+J1EKtSyVu+cw=";
         }) [ "native-debug" "native-release-full" "native-release-size" ];
 
+      treefmtEval = eachSystem (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
+
     in {
 
+      formatter = eachSystem (system:
+        let pkgs = import nixpkgs { inherit system; };
+        in treefmtEval.${pkgs.system}.config.build.wrapper);
+
       devShells = eachSystem (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ devshell.overlays.default ];
-          };
+        let pkgs = import nixpkgs { inherit system; };
         in {
-          default = pkgs.devshell.mkShell {
-            inherit name;
-            imports = [ typelevel-nix.typelevelShell ];
-            typelevelShell = {
-              jdk.package = pkgs.jdk;
-              nodejs.enable = true;
-              native.enable = true;
-              native.libraries = [ pkgs.zlib pkgs.s2n-tls pkgs.openssl ];
-            };
-            packages = with pkgs; [ coreutils which ];
+          default = devenv.lib.mkShell {
+            inherit inputs pkgs;
+            modules = [
+              ({ pkgs, config, ... }: {
+                packages = with pkgs; [
+                  clang
+                  coreutils
+                  llvmPackages.libcxxabi
+                  nodejs
+                  openssl
+                  s2n-tls
+                  which
+                  zlib
+                ];
+                languages = {
+                  java.enable = true;
+                  java.jdk.package = pkgs.jdk;
+                  scala.enable = true;
+                  nix.enable = true;
+                };
+              })
+            ];
           };
         });
 
