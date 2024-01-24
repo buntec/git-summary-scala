@@ -124,11 +124,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1706090516,
-        "narHash": "sha256-ETf6/+Ob/qOH5tEvJSgpfqJU9daVvxmSIK9yINnIluc=",
+        "lastModified": 1706102859,
+        "narHash": "sha256-ctvhnbK1XSUNPUldtsN6KhJyvxssa2Pgtj9NZuj1xTU=",
         "owner": "buntec",
         "repo": "nix-utils",
-        "rev": "aff8730f1fe4992e3ea063628f7f1080d58449b6",
+        "rev": "6f97aa12b687532a550a485fcc34af8e3ce99795",
         "type": "github"
       },
       "original": {

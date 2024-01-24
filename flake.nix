@@ -37,10 +37,11 @@
         "x86_64-linux"
       ];
 
-      buildScalaApp = pkgs: pkgs.callPackage nix-utils.lib.mkBuildScalaApp { };
+      # this gives us buildScalaApp
+      overlays = [ nix-utils.overlays.default ];
 
       mkPackages = pkgs:
-        builtins.removeAttrs (buildScalaApp pkgs {
+        builtins.removeAttrs (pkgs.buildScalaApp {
           inherit version;
           src = ./src;
           pname = name;
@@ -87,11 +88,19 @@
         });
 
       packages = eachSystem (system:
-        let pkgs = import nixpkgs { inherit system; };
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            inherit overlays;
+          };
         in mkPackages pkgs);
 
       apps = eachSystem (system:
-        let pkgs = import nixpkgs { inherit system; };
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            inherit overlays;
+          };
         in builtins.mapAttrs (_: value: (mkApp value)) (mkPackages pkgs));
 
       overlays = {
