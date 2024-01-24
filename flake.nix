@@ -6,10 +6,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     devshell.url = "github:numtide/devshell";
     typelevel-nix.url = "github:typelevel/typelevel-nix";
-    my-nix-utils.url = "github:buntec/nix-utils";
+    nix-utils.url = "github:buntec/nix-utils";
   };
 
-  outputs = { self, devshell, nixpkgs, my-nix-utils, typelevel-nix, ... }:
+  outputs = { self, devshell, nixpkgs, nix-utils, typelevel-nix, ... }:
     let
       inherit (nixpkgs.lib) genAttrs;
 
@@ -29,17 +29,16 @@
         "x86_64-linux"
       ];
 
-      buildScalaApp = pkgs:
-        pkgs.callPackage my-nix-utils.lib.mkBuildScalaApp { };
+      buildScalaApp = pkgs: pkgs.callPackage nix-utils.lib.mkBuildScalaApp { };
 
       mkPackages = pkgs:
-        (buildScalaApp pkgs {
+        builtins.removeAttrs (buildScalaApp pkgs {
           inherit version;
           src = ./src;
           pname = name;
           supported-platforms = [ "jvm" "native" ];
-          sha256 = "sha256-94vxv9VGgqW4WaJ2KvR/vv/AUVrAfVG1/B5SAMVZE18=";
-        });
+          depsHash = "sha256-+hSz3top9VNfKPye5jFzXutrjsj5NV+J1EKtSyVu+cw=";
+        }) [ "native-debug" "native-release-full" "native-release-size" ];
 
     in {
 

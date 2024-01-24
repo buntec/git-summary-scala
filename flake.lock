@@ -92,16 +92,16 @@
         "type": "github"
       }
     },
-    "my-nix-utils": {
+    "nix-utils": {
       "inputs": {
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1706046390,
-        "narHash": "sha256-Fqq2vxF9AWHkt9FPVT92xOffmNWRpAQDErn7BllqGxI=",
+        "lastModified": 1706090516,
+        "narHash": "sha256-ETf6/+Ob/qOH5tEvJSgpfqJU9daVvxmSIK9yINnIluc=",
         "owner": "buntec",
         "repo": "nix-utils",
-        "rev": "28a0ebd3cfff3647679c70d9844e00a261509ace",
+        "rev": "aff8730f1fe4992e3ea063628f7f1080d58449b6",
         "type": "github"
       },
       "original": {
@@ -193,7 +193,7 @@
     "root": {
       "inputs": {
         "devshell": "devshell",
-        "my-nix-utils": "my-nix-utils",
+        "nix-utils": "nix-utils",
         "nixpkgs": "nixpkgs_3",
         "typelevel-nix": "typelevel-nix"
       }
